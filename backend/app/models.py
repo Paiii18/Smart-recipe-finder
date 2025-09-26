@@ -34,8 +34,9 @@ class User(db.Model):
     
     def generate_tokens(self):
         """Generate access and refresh tokens for user"""
-        access_token = create_access_token(identity=self.id)
-        refresh_token = create_refresh_token(identity=self.id)
+        # Convert user ID to string for JWT subject
+        access_token = create_access_token(identity=str(self.id))
+        refresh_token = create_refresh_token(identity=str(self.id))
         return {
             'access_token': access_token,
             'refresh_token': refresh_token
