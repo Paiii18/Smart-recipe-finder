@@ -16,6 +16,7 @@ def create_app():
     app = Flask(__name__)
     
     # Load configuration
+    env = os.environ.get('FLASK_ENV', 'development')
     app.config.from_object('app.config.Config')
     
     # Initialize extensions with app
@@ -23,22 +24,44 @@ def create_app():
     migrate.init_app(app, db)
     jwt.init_app(app)
     
-    # Enable CORS for all routes (allow frontend to call API)
-    CORS(app, origins=['http://localhost:3000'])  # React dev server
+    # Disable strict slashes to prevent 308 redirects
+    app.url_map.strict_slashes = False
+    
+    # Enable CORS - Support Vite (5173) and CRA (3000)
+    CORS(app, 
+        origins=['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000'],
+        supports_credentials=True,
+        allow_headers=['Content-Type', 'Authorization'],
+        expose_headers=['Content-Type', 'Authorization'],
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+    
+    # JWT error handlers
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        return {'error': 'Token has expired', 'message': 'Please login again'}, 401
+    
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error):
+        return {'error': 'Invalid token', 'message': 'Please login again'}, 401
+    
+    @jwt.unauthorized_loader
+    def unauthorized_callback(error):
+        return {'error': 'Missing authorization token', 'message': 'Please login'}, 401
     
     # Import and register blueprints (routes)
     from app.routes.recipes import recipes_bp
     from app.routes.auth import auth_bp
     from app.routes.favorites import favorites_bp
-    
+    from app.routes.meal_plans import meal_plans_bp
+    from app.routes.profile import profile_bp
+
     app.register_blueprint(recipes_bp, url_prefix='/api/recipes')
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(favorites_bp, url_prefix='/api/favorites')
-    
+    app.register_blueprint(meal_plans_bp, url_prefix='/api/meal-plans')
+    app.register_blueprint(profile_bp, url_prefix='/api/profile')
+
     # Import models to ensure they are registered with SQLAlchemy
-    from app import models
-    
-    # Import models first to ensure they are registered
     from app import models
     
     # Create database tables
@@ -52,6 +75,13 @@ def create_app():
     # Basic health check route
     @app.route('/')
     def health_check():
-        return {'message': 'Smart Recipe Finder API is running!', 'status': 'healthy'}
+        return {'message': 'Smart Recipe Finder API is running!', 'status': 'healthy', 'environment': env}
+    
+    # Debug: Print registered routes
+    print("\n📍 Registered Routes:")
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint != 'static':
+            print(f"  {rule.methods} {rule.rule}")
+    print()
     
     return app
