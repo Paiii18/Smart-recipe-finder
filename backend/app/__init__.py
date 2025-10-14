@@ -1,3 +1,4 @@
+import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -28,12 +29,24 @@ def create_app():
     app.url_map.strict_slashes = False
     
     # Enable CORS - Support Vite (5173) and CRA (3000)
+    # Get ngrok URLs from environment or hardcode temporarily
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    allowed_origins = [
+        frontend_url,
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'https://smart-recipe-finder.vercel.app',  # ← Vercel URL kamu
+        'https://smart-recipe-finder-git-master.vercel.app',  # ← Git preview
+        'https://smart-recipe-finder-*.vercel.app',  # ← Preview deployments
+        'https://YOUR-NGROK-URL.ngrok-free.app',  # ← Ngrok backend
+    ] 
+
     CORS(app, 
-        origins=['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000'],
-        supports_credentials=True,
-        allow_headers=['Content-Type', 'Authorization'],
-        expose_headers=['Content-Type', 'Authorization'],
-        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+    origins=allowed_origins,
+    supports_credentials=True,
+    allow_headers=['Content-Type', 'Authorization'],
+    expose_headers=['Content-Type', 'Authorization'],
+    methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
     
     # JWT error handlers
     @jwt.expired_token_loader
