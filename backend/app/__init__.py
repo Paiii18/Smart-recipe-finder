@@ -32,13 +32,13 @@ def create_app():
     # Get ngrok URLs from environment or hardcode temporarily
     frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
     allowed_origins = [
-        frontend_url,
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'https://smart-recipe-finder.vercel.app',  # ← Vercel URL kamu
-        'https://smart-recipe-finder-git-master.vercel.app',  # ← Git preview
-        'https://smart-recipe-finder-*.vercel.app',  # ← Preview deployments
-        'https://YOUR-NGROK-URL.ngrok-free.app',  # ← Ngrok backend
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'https://smart-recipe-finder-lovat.vercel.app',  # ← Main domain
+    'https://smart-recipe-finder-git-master-palii18s-projects.vercel.app',  # ← Git preview
+    'https://smart-recipe-finder-fulgnev9m-palii18s-projects.vercel.app',  # ← Preview
+    'https://*.vercel.app',  # ← All Vercel previews
+    'https://uncut-futilely-wai.ngrok-free.dev',  # ← Ngrok
     ] 
 
     CORS(app, 
