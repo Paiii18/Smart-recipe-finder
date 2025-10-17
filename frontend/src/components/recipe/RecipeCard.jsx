@@ -7,7 +7,7 @@ import userService from '../../services/userService';
 const RecipeCard = ({ recipe, userFavorites = [], onFavoriteUpdate }) => {
   const { isAuthenticated } = useAuthStore();
   const [isFavorited, setIsFavorited] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Check dari userFavorites prop
   useEffect(() => {
@@ -23,30 +23,46 @@ const RecipeCard = ({ recipe, userFavorites = [], onFavoriteUpdate }) => {
       return;
     }
 
-    setIsLoading(true);
+    // Prevent double-click spam
+    if (isProcessing) return;
+    setIsProcessing(true);
+
+    // ✅ OPTIMISTIC UPDATE: Update UI INSTANTLY
+    const previousState = isFavorited;
+    const newState = !isFavorited;
+    setIsFavorited(newState);
     
     try {
-      if (isFavorited) {
+      if (previousState) {
+        // Was favorited, now remove
         await userService.removeFavorite(recipe.idMeal);
-        setIsFavorited(false);
       } else {
+        // Was not favorited, now add
         await userService.addFavorite({
           recipe_id: recipe.idMeal,
           recipe_name: recipe.strMeal,
           recipe_image: recipe.strMealThumb,
         });
-        setIsFavorited(true);
       }
       
-      // Notify parent to reload favorites
+      // ✅ Notify parent with the action details (no re-fetch!)
       if (onFavoriteUpdate) {
-        onFavoriteUpdate();
+        onFavoriteUpdate({
+          action: newState ? 'add' : 'remove',
+          recipe: {
+            recipe_id: recipe.idMeal,
+            recipe_name: recipe.strMeal,
+            recipe_image: recipe.strMealThumb,
+          }
+        });
       }
     } catch (error) {
+      // ❌ ROLLBACK on error
       console.error('Failed to update favorite:', error);
-      alert(error.message || 'Failed to update favorite');
+      setIsFavorited(previousState);
+      alert(error.message || 'Failed to update favorite. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -65,14 +81,19 @@ const RecipeCard = ({ recipe, userFavorites = [], onFavoriteUpdate }) => {
         {isAuthenticated && (
           <button
             onClick={handleFavoriteClick}
-            disabled={isLoading}
-            className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-sm transition ${
+            disabled={isProcessing}
+            className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-sm transition-all duration-200 ${
               isFavorited
-                ? 'bg-red-500 text-white'
-                : 'bg-white/80 text-gray-600 hover:bg-white'
-            } disabled:opacity-50`}
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-white/80 text-gray-600 hover:bg-white hover:scale-110'
+            } disabled:opacity-70 disabled:cursor-not-allowed`}
+            aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
           >
-            <Heart className={`w-5 h-5 ${isFavorited ? 'fill-current' : ''}`} />
+            <Heart 
+              className={`w-5 h-5 transition-all duration-200 ${
+                isFavorited ? 'fill-current scale-110' : ''
+              }`} 
+            />
           </button>
         )}
 

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Search, Loader2, ChefHat } from 'lucide-react';
-import { useTranslation } from 'react-i18next'; // ← STEP 1: Import hook
+import { useTranslation } from 'react-i18next';
 import recipeService from '../services/recipeService';
 import userService from '../services/userService';
 import RecipeCard from '../components/recipe/RecipeCard';
 import useAuthStore from '../store/authStore';
 
 const Home = () => {
-  const { t } = useTranslation(); // ← STEP 2: Initialize hook
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [recipes, setRecipes] = useState([]);
@@ -63,7 +63,7 @@ const Home = () => {
       
       setRecipes(randomRecipes);
     } catch (err) {
-      setError(t('home.loadError')); // ← STEP 3: Replace text
+      setError(t('home.loadError'));
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -81,11 +81,11 @@ const Home = () => {
     try {
       const results = await recipeService.searchByName(searchQuery);
       if (results.length === 0) {
-        setError(t('home.noResults')); // ← Replace text
+        setError(t('home.noResults'));
       }
       setRecipes(results);
     } catch (err) {
-      setError(t('home.searchFailed')); // ← Replace text
+      setError(t('home.searchFailed'));
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -102,7 +102,7 @@ const Home = () => {
       const results = await recipeService.filterByCategory(category);
       setRecipes(results);
     } catch (err) {
-      setError(t('home.categoryLoadFailed')); // ← Replace text
+      setError(t('home.categoryLoadFailed'));
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -115,10 +115,27 @@ const Home = () => {
     loadRandomRecipes();
   };
 
-  const handleFavoriteUpdate = () => {
-    if (isAuthenticated) {
-      loadUserFavorites();
-    }
+  // ✅ SMART UPDATE: Update local state, NO re-fetch!
+  const handleFavoriteUpdate = ({ action, recipe }) => {
+    if (!isAuthenticated) return;
+
+    setUserFavorites(prevFavorites => {
+      if (action === 'add') {
+        // Check if already exists (shouldn't, but safety check)
+        const exists = prevFavorites.some(fav => fav.recipe_id === recipe.recipe_id);
+        if (exists) return prevFavorites;
+        
+        // Add to favorites
+        return [...prevFavorites, {
+          ...recipe,
+          created_at: new Date().toISOString(),
+          id: Date.now() // Temporary ID
+        }];
+      } else {
+        // Remove from favorites
+        return prevFavorites.filter(fav => fav.recipe_id !== recipe.recipe_id);
+      }
+    });
   };
 
   return (
@@ -131,10 +148,10 @@ const Home = () => {
               <ChefHat className="w-10 h-10 sm:w-12 sm:h-12 text-green-600" />
             </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4">
-              {t('home.heroTitle')} {/* ← Translated */}
+              {t('home.heroTitle')}
             </h1>
             <p className="text-lg sm:text-xl text-green-100 mb-6 sm:mb-8">
-              {t('home.subtitle')} {/* ← Translated */}
+              {t('home.subtitle')}
             </p>
 
             <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
@@ -143,7 +160,7 @@ const Home = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('home.searchPlaceholder')} // ← Translated
+                  placeholder={t('home.searchPlaceholder')}
                   className="w-full px-4 sm:px-6 py-3 sm:py-4 pr-12 sm:pr-14 text-gray-800 rounded-full focus:outline-none focus:ring-4 focus:ring-green-300 shadow-lg text-sm sm:text-base"
                 />
                 <button
@@ -170,14 +187,14 @@ const Home = () => {
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
-              {t('home.categories')} {/* ← Translated */}
+              {t('home.categories')}
             </h2>
             {(selectedCategory || searchQuery) && (
               <button
                 onClick={handleClearFilters}
                 className="text-sm text-green-600 hover:text-green-700 font-medium"
               >
-                {t('home.clearFilters')} {/* ← Translated */}
+                {t('home.clearFilters')}
               </button>
             )}
           </div>
@@ -212,7 +229,7 @@ const Home = () => {
               ? `${selectedCategory} ${t('home.recipes')}`
               : searchQuery
               ? `${t('home.searchResultsFor')} "${searchQuery}"`
-              : t('home.featuredRecipes')} {/* ← Translated */}
+              : t('home.featuredRecipes')}
           </h2>
 
           {error && (
@@ -225,13 +242,13 @@ const Home = () => {
             <div className="flex flex-col items-center justify-center py-16 sm:py-20">
               <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-green-600 animate-spin mb-4" />
               <p className="text-gray-600 text-sm sm:text-base">
-                {t('home.loading')} {/* ← Translated */}
+                {t('home.loading')}
               </p>
             </div>
           ) : recipes.length === 0 && !error ? (
             <div className="text-center py-16 sm:py-20">
               <p className="text-gray-600 text-base sm:text-lg">
-                {t('home.noRecipes')} {/* ← Translated */}
+                {t('home.noRecipes')}
               </p>
             </div>
           ) : (
