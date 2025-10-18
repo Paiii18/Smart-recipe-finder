@@ -11,6 +11,12 @@ const RecipeCard = ({ recipe, userFavorites = [], onFavoriteUpdate }) => {
 
   // Check dari userFavorites prop
   useEffect(() => {
+    // ✅ Defensive check: ensure userFavorites is an array
+    if (!Array.isArray(userFavorites)) {
+      setIsFavorited(false);
+      return;
+    }
+    
     const found = userFavorites.some(fav => fav.recipe_id === recipe.idMeal);
     setIsFavorited(found);
   }, [userFavorites, recipe.idMeal]);

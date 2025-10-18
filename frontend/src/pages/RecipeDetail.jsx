@@ -13,6 +13,7 @@ const RecipeDetail = () => {
   const [recipe, setRecipe] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -22,13 +23,21 @@ const RecipeDetail = () => {
     }
   }, [id, isAuthenticated]);
 
+  // ✅ Optimized: Use /check endpoint instead of fetching all favorites
   const checkFavoriteStatus = async () => {
     try {
-      const favorites = await userService.getFavorites();
-      const found = favorites.some((fav) => fav.recipe_id === id);
-      setIsFavorited(found);
+      const result = await userService.isFavorite(id);
+      setIsFavorited(result);
     } catch (err) {
       console.error("Failed to check favorite:", err);
+      // Fallback: if isFavorite endpoint fails, try getting all favorites
+      try {
+        const favorites = await userService.getFavorites();
+        const found = favorites.some((fav) => fav.recipe_id === id);
+        setIsFavorited(found);
+      } catch (fallbackErr) {
+        console.error("Fallback check also failed:", fallbackErr);
+      }
     }
   };
 
@@ -51,27 +60,41 @@ const RecipeDetail = () => {
     }
   };
 
+  // ✅ OPTIMISTIC UPDATE: Update UI first, API in background
   const handleFavoriteClick = async () => {
     if (!isAuthenticated) {
       alert("Please login to save favorites");
       return;
     }
 
+    // Prevent double-click spam
+    if (isProcessing) return;
+    setIsProcessing(true);
+
+    // ✅ OPTIMISTIC: Update UI INSTANTLY
+    const previousState = isFavorited;
+    const newState = !isFavorited;
+    setIsFavorited(newState);
+
     try {
-      if (isFavorited) {
+      if (previousState) {
+        // Was favorited, now remove
         await userService.removeFavorite(recipe.idMeal);
-        setIsFavorited(false);
       } else {
+        // Was not favorited, now add
         await userService.addFavorite({
           recipe_id: recipe.idMeal,
           recipe_name: recipe.strMeal,
           recipe_image: recipe.strMealThumb,
         });
-        setIsFavorited(true);
       }
     } catch (error) {
+      // ❌ ROLLBACK on error
       console.error("Failed to update favorite:", error);
-      alert(error.message || "Failed to update favorite");
+      setIsFavorited(previousState);
+      alert(error.message || "Failed to update favorite. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -136,6 +159,7 @@ const RecipeDetail = () => {
           <button
             onClick={() => navigate(-1)}
             className="p-2 bg-white/90 rounded-full hover:bg-white transition"
+            aria-label="Go back"
           >
             <ArrowLeft className="w-6 h-6 text-gray-800" />
           </button>
@@ -145,14 +169,18 @@ const RecipeDetail = () => {
           <div className="absolute top-6 right-6">
             <button
               onClick={handleFavoriteClick}
-              className={`p-3 rounded-full transition ${
+              disabled={isProcessing}
+              className={`p-3 rounded-full transition-all duration-200 ${
                 isFavorited
-                  ? "bg-red-500 text-white"
-                  : "bg-white/90 text-gray-800 hover:bg-white"
-              }`}
+                  ? "bg-red-500 text-white hover:bg-red-600"
+                  : "bg-white/90 text-gray-800 hover:bg-white hover:scale-110"
+              } disabled:opacity-70 disabled:cursor-not-allowed`}
+              aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
             >
               <Heart
-                className={`w-6 h-6 ${isFavorited ? "fill-current" : ""}`}
+                className={`w-6 h-6 transition-all duration-200 ${
+                  isFavorited ? "fill-current scale-110" : ""
+                }`}
               />
             </button>
           </div>

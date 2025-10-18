@@ -30,6 +30,7 @@ def get_user_favorites():
         }), 200
         
     except Exception as e:
+        print(f"❌ Error in get_user_favorites: {str(e)}")  # Debug log
         return jsonify({'error': 'Failed to get favorites'}), 500
 
 @favorites_bp.route('/add', methods=['POST'])
@@ -47,26 +48,27 @@ def add_to_favorites():
         # Get request data
         data = request.get_json()
         
-        if not data or 'recipe_id' not in data:
+        # Validate required fields
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        if 'recipe_id' not in data:
             return jsonify({'error': 'Recipe ID is required'}), 400
+            
+        if 'recipe_name' not in data:
+            return jsonify({'error': 'Recipe name is required'}), 400
         
+        # ✅ USE DATA FROM FRONTEND (no extra API call!)
         recipe_id = data['recipe_id']
-        
-        # Get recipe details from TheMealDB API
-        service = RecipeService()
-        recipe_result = service.get_recipe_by_id(recipe_id)
-        
-        if not recipe_result['success']:
-            return jsonify({'error': 'Recipe not found or invalid'}), 404
-        
-        recipe_data = recipe_result['data']
+        recipe_name = data['recipe_name']
+        recipe_image = data.get('recipe_image', '')  # Optional, default to empty string
         
         # Create favorite entry
         favorite = Favorite(
             user_id=current_user_id,
             recipe_id=recipe_id,
-            recipe_name=recipe_data['name'],
-            recipe_image=recipe_data['image']
+            recipe_name=recipe_name,
+            recipe_image=recipe_image
         )
         
         # Save to database
@@ -78,12 +80,16 @@ def add_to_favorites():
             'data': favorite.to_dict()
         }), 201
         
-    except IntegrityError:
+    except IntegrityError as e:
         db.session.rollback()
+        print(f"❌ IntegrityError in add_to_favorites: {str(e)}")  # Debug log
         return jsonify({'error': 'Recipe is already in your favorites'}), 409
     
     except Exception as e:
         db.session.rollback()
+        print(f"❌ Error in add_to_favorites: {str(e)}")  # Debug log
+        import traceback
+        traceback.print_exc()  # Print full traceback for debugging
         return jsonify({'error': 'Failed to add recipe to favorites'}), 500
 
 @favorites_bp.route('/remove/<recipe_id>', methods=['DELETE'])
@@ -113,6 +119,7 @@ def remove_from_favorites(recipe_id):
         
     except Exception as e:
         db.session.rollback()
+        print(f"❌ Error in remove_from_favorites: {str(e)}")  # Debug log
         return jsonify({'error': 'Failed to remove recipe from favorites'}), 500
 
 @favorites_bp.route('/check/<recipe_id>', methods=['GET'])
@@ -138,6 +145,7 @@ def check_favorite_status(recipe_id):
         }), 200
         
     except Exception as e:
+        print(f"❌ Error in check_favorite_status: {str(e)}")  # Debug log
         return jsonify({'error': 'Failed to check favorite status'}), 500
 
 @favorites_bp.route('/toggle', methods=['POST'])
@@ -178,21 +186,28 @@ def toggle_favorite():
             }), 200
         else:
             # Add to favorites
-            # Get recipe details from API
-            service = RecipeService()
-            recipe_result = service.get_recipe_by_id(recipe_id)
+            # ✅ USE DATA FROM FRONTEND (if provided)
+            recipe_name = data.get('recipe_name')
+            recipe_image = data.get('recipe_image', '')
             
-            if not recipe_result['success']:
-                return jsonify({'error': 'Recipe not found or invalid'}), 404
-            
-            recipe_data = recipe_result['data']
+            # If frontend didn't provide name/image, fetch from API
+            if not recipe_name:
+                service = RecipeService()
+                recipe_result = service.get_recipe_by_id(recipe_id)
+                
+                if not recipe_result['success']:
+                    return jsonify({'error': 'Recipe not found or invalid'}), 404
+                
+                recipe_data = recipe_result['data']
+                recipe_name = recipe_data.get('strMeal', recipe_data.get('name', 'Unknown Recipe'))
+                recipe_image = recipe_data.get('strMealThumb', recipe_data.get('image', ''))
             
             # Create favorite entry
             favorite = Favorite(
                 user_id=current_user_id,
                 recipe_id=recipe_id,
-                recipe_name=recipe_data['name'],
-                recipe_image=recipe_data['image']
+                recipe_name=recipe_name,
+                recipe_image=recipe_image
             )
             
             db.session.add(favorite)
@@ -205,8 +220,15 @@ def toggle_favorite():
                 'data': favorite.to_dict()
             }), 201
         
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'Recipe is already in your favorites'}), 409
+        
     except Exception as e:
         db.session.rollback()
+        print(f"❌ Error in toggle_favorite: {str(e)}")  # Debug log
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Failed to toggle favorite status'}), 500
 
 @favorites_bp.route('/stats', methods=['GET'])
@@ -241,4 +263,5 @@ def get_favorites_stats():
         }), 200
         
     except Exception as e:
+        print(f"❌ Error in get_favorites_stats: {str(e)}")  # Debug log
         return jsonify({'error': 'Failed to get favorites statistics'}), 500

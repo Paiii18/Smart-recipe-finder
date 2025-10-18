@@ -29,18 +29,27 @@ const Favorites = () => {
     }
   };
 
+  // ✅ OPTIMISTIC DELETE: Remove from UI first, API in background
   const handleRemoveFavorite = async (favorite) => {
-    // Pass whole favorite object
     if (!confirm("Remove this recipe from favorites?")) return;
 
+    // Prevent double-click
+    if (deletingId === favorite.id) return;
     setDeletingId(favorite.id);
 
+    // ✅ OPTIMISTIC: Remove from UI INSTANTLY
+    const previousFavorites = [...favorites];
+    setFavorites(favorites.filter((fav) => fav.id !== favorite.id));
+
     try {
-      await userService.removeFavorite(favorite.recipe_id); // Use recipe_id instead of favorite.id
-      setFavorites(favorites.filter((fav) => fav.id !== favorite.id));
+      // API call in background
+      await userService.removeFavorite(favorite.recipe_id);
+      // Success - UI already updated!
     } catch (err) {
+      // ❌ ROLLBACK on error
       console.error("Failed to remove favorite:", err);
-      alert("Failed to remove favorite");
+      setFavorites(previousFavorites);
+      alert("Failed to remove favorite. Please try again.");
     } finally {
       setDeletingId(null);
     }
@@ -101,7 +110,9 @@ const Favorites = () => {
             {favorites.map((favorite) => (
               <div
                 key={favorite.id}
-                className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 group"
+                className={`bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 group ${
+                  deletingId === favorite.id ? 'opacity-50 scale-95' : ''
+                }`}
               >
                 <Link to={`/recipe/${favorite.recipe_id}`}>
                   {/* Image */}
